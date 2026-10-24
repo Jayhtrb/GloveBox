@@ -660,6 +660,22 @@ select.input { appearance: auto; }
   .content { padding: 16px; }
 }
 
+/* Short landscape screens: a phone or a mirrored display in the car. */
+@media (max-height: 520px) and (orientation: landscape) {
+  .topbar { height: 52px; padding: 0 16px; gap: 10px; }
+  .brand { font-size: 16px; }
+  .status { font-size: 13px; gap: 10px; }
+  .rail { padding: 8px 8px; gap: 2px; }
+  .rail-item { padding: 6px 4px; font-size: 11px; gap: 3px; }
+  .content { padding: 12px 16px 14px; }
+  .home-grid { gap: 12px; }
+  .featured { min-height: 220px; }
+  .card { padding: 14px; }
+  .drive-banner { padding: 8px 12px; font-size: 13px; }
+  .drive .tile { padding: 10px 6px; }
+  .drive .tile .mark { width: 56px; height: 56px; font-size: 18px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;
