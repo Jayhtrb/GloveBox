@@ -27,6 +27,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import java.util.Locale
@@ -39,7 +43,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var drivingBar: LinearLayout
     private lateinit var statusBadge: TextView
 
-    private lateinit var driveMonitor: DriveModeMonitor
     private lateinit var pinStore: PinStore
     private var tts: TextToSpeech? = null
     private var ttsReady = false
@@ -49,7 +52,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
             if (grants[Manifest.permission.ACCESS_FINE_LOCATION] == true) {
-                driveMonitor.start()
+                DriveService.start(this)
             }
         }
 
@@ -78,17 +81,28 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         configureControls()
         goFullscreen()
 
-        driveMonitor = DriveModeMonitor(this) { driving -> applyMode(driving) }
         pinStore = PinStore(this)
         tts = TextToSpeech(this, this)
+
+        // Drive state comes from the foreground service, so it keeps updating
+        // while another app (for example navigation) is in front.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                DriveService.driving.collect { applyMode(it) }
+            }
+        }
 
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
             PackageManager.PERMISSION_GRANTED
         ) {
-            driveMonitor.start()
+            DriveService.start(this)
         } else {
             permissionLauncher.launch(
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.RECORD_AUDIO)
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.RECORD_AUDIO,
+                    Manifest.permission.POST_NOTIFICATIONS
+                )
             )
         }
 
@@ -119,7 +133,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     override fun onDestroy() {
-        driveMonitor.stop()
+        // The DriveService keeps running on purpose; only the UI goes away here.
         tts?.stop()
         tts?.shutdown()
         webView.destroy()
@@ -170,7 +184,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
             override fun onPageFinished(view: WebView, url: String?) {
                 urlInput.setText(url ?: "")
-                if (driveMonitor.isDriving) pauseVideosWhileDriving()
+                if (DriveService.driving.value) pauseVideosWhileDriving()
             }
         }
         webView.webChromeClient = WebChromeClient()

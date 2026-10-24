@@ -16,4 +16,6 @@
     <string name="badge_parked">Parked · full controls</string>
     <string name="voice_prompt">Say a search or an address</string>
     <string name="voice_unavailable">Voice search unavailable on this device</string>
+    <string name="drive_channel_name">Drive Mode monitoring</string>
+    <string name="drive_channel_text">Watching speed to switch to Drive Mode</string>
 </resources>

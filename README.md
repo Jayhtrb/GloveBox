@@ -83,7 +83,8 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 1. **Wired**: plug the phone into the head unit. Open Android Auto's launcher settings and make sure Glovebox is enabled if your head unit lists third-party apps.
 2. **Wireless**: on the phone, Android 11+ with 5 GHz Wi‑Fi. In Android Auto settings, enable "Wireless Android Auto" and pair over Bluetooth once.
-3. Drive as usual. Glovebox switches to Drive Mode on its own. Stopped at a light? It stays in Drive Mode for 30 seconds after you stop, then returns to full controls.
+3. Drive as usual. Glovebox switches to Drive Mode on its own, and keeps watching speed while navigation is in front. A persistent low-priority notification ("Drive Mode monitoring") shows while the service runs; that's how Android keeps GPS on.
+   In Drive Mode you can still use Voice, Read, Pins, Back and Stop. Typing an address is hidden while moving. Stopped at a light? It stays in Drive Mode for 30 seconds after you stop, then returns to full controls.
 
 ## Safety and legal notes
 
@@ -98,6 +99,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 - [x] Video lock while driving
 - [x] Voice search and read-aloud
 - [x] Pinned road tiles (up to 5, `PinStore`, unit-tested; pinned from the Pins dialog)
+- [x] Drive Mode keeps working in the background: GPS runs in a foreground service (`DriveService`), so it still switches correctly while Google Maps or another app is in front
 - [x] CI: unit tests and debug APK build on every push (GitHub Actions)
 - [ ] Remove or rename a pin (needs a small management screen)
 - [ ] Car App Library surface for Android Auto's official templates (only if a permitted category fits)
