@@ -1,128 +1,84 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/gb_background"
-    android:orientation="vertical">
+    android:background="@color/gb_background">
 
-    <!-- Parked: full address bar -->
-    <LinearLayout
-        android:id="@+id/addressBar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="8dp"
-        android:gravity="center_vertical"
-        android:background="@color/gb_surface">
-
-        <EditText
-            android:id="@+id/urlInput"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:hint="@string/url_hint"
-            android:imeOptions="actionGo"
-            android:inputType="textUri"
-            android:singleLine="true"
-            android:textColor="@color/gb_text"
-            android:textColorHint="@color/gb_text_dim" />
-
-        <Button
-            android:id="@+id/btnVoice"
-            style="@style/GbButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/btn_voice" />
-    </LinearLayout>
-
-    <!-- Web content -->
+    <!-- The GloveBox home screen: the bundled web UI that matches the design. -->
     <WebView
-        android:id="@+id/webView"
+        android:id="@+id/dashboard"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_height="match_parent" />
 
-    <!-- Driving: big buttons only -->
+    <!-- Native browser, shown on top of the dashboard when the user browses. -->
     <LinearLayout
-        android:id="@+id/drivingBar"
+        android:id="@+id/browseOverlay"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
         android:visibility="gone"
-        android:padding="12dp"
-        android:background="@color/gb_surface">
+        android:background="@color/gb_background">
 
-        <Button
-            android:id="@+id/btnBackDriving"
-            style="@style/GbButtonLarge"
-            android:layout_width="0dp"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/btn_back" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="8dp"
+            android:background="@color/gb_surface">
 
-        <Button
-            android:id="@+id/btnReadAloud"
-            style="@style/GbButtonLarge"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/btn_read" />
+            <Button
+                android:id="@+id/btnBrowseBack"
+                style="@style/GbButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="←" />
 
-        <Button
-            android:id="@+id/btnVoiceDriving"
-            style="@style/GbButtonLarge"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/btn_voice" />
+            <Button
+                android:id="@+id/btnBrowseForward"
+                style="@style/GbButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="→" />
 
-        <Button
-            android:id="@+id/btnPins"
-            style="@style/GbButtonLarge"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/btn_pins" />
+            <Button
+                android:id="@+id/btnBrowseReload"
+                style="@style/GbButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⟳" />
 
-        <Button
-            android:id="@+id/btnStopReading"
-            style="@style/GbButtonLarge"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/btn_stop" />
+            <EditText
+                android:id="@+id/urlInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="@string/url_hint"
+                android:imeOptions="actionGo"
+                android:inputType="textUri"
+                android:singleLine="true"
+                android:textColor="@color/gb_text"
+                android:textColorHint="@color/gb_text_dim" />
+
+            <Button
+                android:id="@+id/btnBrowseHome"
+                style="@style/GbButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⌂" />
+
+            <Button
+                android:id="@+id/btnCloseBrowse"
+                style="@style/GbButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_close_browse" />
+        </LinearLayout>
+
+        <WebView
+            android:id="@+id/browse"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
     </LinearLayout>
-
-    <!-- Bottom strip: mode badge + parked controls -->
-    <LinearLayout
-        android:id="@+id/statusBar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:padding="6dp"
-        android:background="@color/gb_surface">
-
-        <TextView
-            android:id="@+id/statusBadge"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:textColor="@color/gb_accent"
-            android:textSize="13sp" />
-
-        <Button
-            android:id="@+id/btnBackParked"
-            style="@style/GbButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/btn_back" />
-
-        <Button
-            android:id="@+id/btnHome"
-            style="@style/GbButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/btn_home" />
-    </LinearLayout>
-</LinearLayout>
+</FrameLayout>

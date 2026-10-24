@@ -3,6 +3,7 @@ import { Car, Globe, Home, LayoutGrid, Mic, Music, Navigation, Settings, Smartph
 import { useApp } from '../store';
 import type { Route } from '../data';
 import { Logo } from './Primitives';
+import { isNative } from '../native';
 
 export function useNow(intervalMs = 15000): Date {
   const [now, setNow] = useState(new Date());
@@ -82,7 +83,7 @@ export function TopBar() {
         aria-pressed={prefs.driveMode}
         title="Demo switch. On Android, Drive Mode follows vehicle and GPS state."
       >
-        {prefs.driveMode ? 'Drive Mode (demo)' : 'Parked (demo)'}
+        {isNative ? (prefs.driveMode ? 'Drive Mode' : 'Parked') : prefs.driveMode ? 'Drive Mode (demo)' : 'Parked (demo)'}
       </button>
       <div className="status" aria-label="Status">
         <span className="time">{time}</span>

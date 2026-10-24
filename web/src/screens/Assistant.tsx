@@ -1,9 +1,10 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Mic, MicOff, Send, Sparkles } from 'lucide-react';
 import { useApp } from '../store';
 import { COMMAND_SUGGESTIONS } from '../data';
 import { runCommand, type CommandContext } from '../commands';
 import { Pill } from '../components/Primitives';
+import { isNative, native } from '../native';
 
 interface Turn {
   role: 'user' | 'assistant';
@@ -66,7 +67,32 @@ export default function Assistant() {
     submit(input);
   };
 
+  // Inside the Android app, the system recognizer returns its result through this hook.
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
+  useEffect(() => {
+    if (!isNative) return;
+    window.gloveboxVoiceResult = (text: string) => {
+      setListening(false);
+      if (text.trim()) {
+        setNote(null);
+        submitRef.current(text);
+      } else {
+        setNote('No speech was recognized. Try again or type your command.');
+      }
+    };
+    return () => {
+      delete window.gloveboxVoiceResult;
+    };
+  }, []);
+
   const listen = () => {
+    if (isNative) {
+      setNote(null);
+      setListening(true);
+      native?.startVoice();
+      return;
+    }
     const Rec = getRecognizer();
     if (!Rec) {
       setNote('Voice input is not supported in this browser. Type your command below.');

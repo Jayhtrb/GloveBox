@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { BUILTIN_APPS, TRACKS, type AppDef, type Route, type Track } from './data';
+import { isNative, native } from './native';
 
 export type Theme = 'dark' | 'light' | 'auto';
 export type Accent = 'blue' | 'violet' | 'mint';
@@ -139,8 +140,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
   const go = useCallback((r: Route) => {
+    // Inside the Android app, browsing happens in the native browser so sites that block
+    // iframes still load, and video lock can be enforced.
+    if (r === 'browser' && isNative) {
+      native?.showBrowser(prefs.homeUrl);
+      return;
+    }
     window.location.hash = `/${r}`;
     setRoute(r);
+  }, [prefs.homeUrl]);
+
+  // The Android app reports Drive Mode from its foreground service.
+  useEffect(() => {
+    window.gloveboxSetDriving = (driving: boolean) => setPrefsState((p) => ({ ...p, driveMode: driving }));
+    return () => {
+      delete window.gloveboxSetDriving;
+    };
   }, []);
 
   const [browserTarget, setBrowserTarget] = useState<{ url: string; n: number }>({ url: prefs.homeUrl, n: 0 });
@@ -148,6 +163,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (url: string) => {
       setBrowserTarget((t) => ({ url, n: t.n + 1 }));
       setPrefsState((p) => ({ ...p, recentUrls: [url, ...p.recentUrls.filter((u) => u !== url)].slice(0, 8) }));
+      if (isNative) {
+        native?.openUrl(url);
+        return;
+      }
       go('browser');
     },
     [go],
@@ -159,7 +178,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         go(app.route);
       } else if (app.url) {
         const mode = prefs.launch[app.id] ?? 'browser';
-        if (mode === 'newtab') {
+        if (mode === 'newtab' && !isNative) {
           window.open(app.url, '_blank', 'noopener,noreferrer');
         } else {
           openUrl(app.url);

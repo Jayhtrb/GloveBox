@@ -12,3 +12,4 @@ captures/
 .cxx/
 web/node_modules/
 web/dist/
+app/src/main/assets/glovebox/

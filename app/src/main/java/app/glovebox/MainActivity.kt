@@ -9,45 +9,55 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.speech.RecognizerIntent
-import android.speech.tts.TextToSpeech
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.webkit.WebViewAssetLoader
 import kotlinx.coroutines.launch
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
-import java.util.Locale
+import org.json.JSONObject
 
-class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
+/**
+ * Shows the GloveBox UI (bundled from web/ into assets/glovebox) as the home screen.
+ * Browsing happens in a native WebView on top of it, so sites that block iframes still load.
+ *
+ * Drive state comes from [DriveService] and is pushed into the web UI, which then shows the
+ * Drive Mode layout. While driving, browsing closes and any video is paused.
+ */
+class MainActivity : AppCompatActivity() {
 
-    private lateinit var webView: WebView
-    private lateinit var addressBar: LinearLayout
+    private lateinit var dashboard: WebView
+    private lateinit var browse: WebView
+    private lateinit var browseOverlay: LinearLayout
     private lateinit var urlInput: EditText
-    private lateinit var drivingBar: LinearLayout
-    private lateinit var statusBadge: TextView
 
-    private lateinit var pinStore: PinStore
-    private var tts: TextToSpeech? = null
-    private var ttsReady = false
+    private val homeUrl = "https://www.google.com"
 
-    private val homeUrl = "https://duckduckgo.com/"
+    private val assetLoader by lazy {
+        WebViewAssetLoader.Builder()
+            .setDomain(APP_DOMAIN)
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
+    }
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
@@ -58,12 +68,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private val voiceLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            if (result.resultCode == Activity.RESULT_OK) {
-                val spoken = result.data
-                    ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-                    ?.firstOrNull()
-                if (!spoken.isNullOrBlank()) loadInput(spoken)
-            }
+            val spoken = if (result.resultCode == Activity.RESULT_OK) {
+                result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull().orEmpty()
+            } else ""
+            // Always answer, even on cancel, so the web UI can leave its listening state.
+            dashboard.evaluateJavascript(
+                "window.gloveboxVoiceResult && window.gloveboxVoiceResult(${JSONObject.quote(spoken)})",
+                null
+            )
         }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -71,24 +83,35 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        webView = findViewById(R.id.webView)
-        addressBar = findViewById(R.id.addressBar)
+        dashboard = findViewById(R.id.dashboard)
+        browse = findViewById(R.id.browse)
+        browseOverlay = findViewById(R.id.browseOverlay)
         urlInput = findViewById(R.id.urlInput)
-        drivingBar = findViewById(R.id.drivingBar)
-        statusBadge = findViewById(R.id.statusBadge)
 
-        configureWebView()
-        configureControls()
+        configureDashboard()
+        configureBrowser()
+        configureBrowseControls()
         goFullscreen()
 
-        pinStore = PinStore(this)
-        tts = TextToSpeech(this, this)
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                when {
+                    browseOverlay.visibility == View.VISIBLE && browse.canGoBack() -> browse.goBack()
+                    browseOverlay.visibility == View.VISIBLE -> closeBrowse()
+                    dashboard.canGoBack() -> dashboard.goBack()
+                    else -> {
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                    }
+                }
+            }
+        })
 
-        // Drive state comes from the foreground service, so it keeps updating
-        // while another app (for example navigation) is in front.
+        // Drive state comes from the foreground service, so it keeps updating while
+        // navigation is in front.
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                DriveService.driving.collect { applyMode(it) }
+                DriveService.driving.collect { applyDriving(it) }
             }
         }
 
@@ -106,76 +129,94 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             )
         }
 
-        applyMode(false)
-        val incoming = intent?.dataString
-        loadInput(incoming ?: savedInstanceState?.getString(KEY_URL) ?: homeUrl)
+        dashboard.loadUrl(DASHBOARD_URL)
+        intent?.dataString?.let { openBrowse(it) }
     }
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
-        intent?.dataString?.let { loadInput(it) }
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        outState.putString(KEY_URL, webView.url ?: homeUrl)
+        intent?.dataString?.let { openBrowse(it) }
     }
 
     override fun onResume() {
         super.onResume()
-        webView.onResume()
+        dashboard.onResume()
+        if (browseOverlay.visibility == View.VISIBLE) browse.onResume()
     }
 
     override fun onPause() {
-        // Pausing the WebView stops background media, the first line of video lock.
-        webView.onPause()
+        // Pausing the WebViews stops background media, the first line of video lock.
+        dashboard.onPause()
+        browse.onPause()
         super.onPause()
     }
 
     override fun onDestroy() {
-        // The DriveService keeps running on purpose; only the UI goes away here.
-        tts?.stop()
-        tts?.shutdown()
-        webView.destroy()
+        // DriveService keeps running on purpose; only the UI goes away here.
+        dashboard.destroy()
+        browse.destroy()
         super.onDestroy()
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
-            webView.goBack()
-            return true
-        }
-        return super.onKeyDown(keyCode, event)
-    }
-
-    override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            tts?.language = Locale.getDefault()
-            ttsReady = true
-        }
     }
 
     // --- Setup ----------------------------------------------------------------
 
-    @SuppressLint("SetJavaScriptEnabled")
-    private fun configureWebView() {
-        webView.settings.apply {
+    @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
+    private fun configureDashboard() {
+        dashboard.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
-            // Media must be started by a user tap, never by a page.
+            mediaPlaybackRequiresUserGesture = true
+            cacheMode = WebSettings.LOAD_DEFAULT
+        }
+        dashboard.addJavascriptInterface(NativeBridge(), "GloveBoxNative")
+        dashboard.webChromeClient = WebChromeClient()
+        dashboard.webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
+                assetLoader.shouldInterceptRequest(request.url)
+
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                val uri = request.url
+                return when (uri.scheme) {
+                    "https", "http" -> {
+                        if (uri.host != APP_DOMAIN) openBrowse(uri.toString())
+                        true
+                    }
+                    else -> {
+                        try {
+                            startActivity(Intent(Intent.ACTION_VIEW, uri))
+                        } catch (_: Exception) {
+                        }
+                        true
+                    }
+                }
+            }
+
+            override fun onPageFinished(view: WebView, url: String?) {
+                // Tell the freshly loaded page the current drive state.
+                pushDrivingToWeb(DriveService.driving.value)
+            }
+        }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun configureBrowser() {
+        browse.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            // Media must be started by a tap, never by a page.
             mediaPlaybackRequiresUserGesture = true
             loadWithOverviewMode = true
             useWideViewPort = true
             builtInZoomControls = false
             cacheMode = WebSettings.LOAD_DEFAULT
         }
-        webView.webViewClient = object : WebViewClient() {
+        browse.webChromeClient = WebChromeClient()
+        browse.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                // Keep everything inside Glovebox; hand off only non-web schemes.
-                val scheme = request.url.scheme ?: return false
-                return if (scheme == "http" || scheme == "https") false else {
+                val uri = request.url
+                return if (uri.scheme == "http" || uri.scheme == "https") false else {
                     try {
-                        startActivity(Intent(Intent.ACTION_VIEW, request.url))
+                        startActivity(Intent(Intent.ACTION_VIEW, uri))
                     } catch (_: Exception) {
                     }
                     true
@@ -184,78 +225,68 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
             override fun onPageFinished(view: WebView, url: String?) {
                 urlInput.setText(url ?: "")
-                if (DriveService.driving.value) pauseVideosWhileDriving()
+                if (DriveService.driving.value) pauseVideos(browse)
             }
         }
-        webView.webChromeClient = WebChromeClient()
     }
 
-    private fun configureControls() {
+    private fun configureBrowseControls() {
         urlInput.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_GO || actionId == EditorInfo.IME_ACTION_DONE) {
-                loadInput(urlInput.text.toString())
+                loadInBrowse(urlInput.text.toString())
                 true
             } else false
         }
-
-        findViewById<Button>(R.id.btnVoice).setOnClickListener { startVoiceSearch() }
-        findViewById<Button>(R.id.btnBackParked).setOnClickListener { goBackSafely() }
-        findViewById<Button>(R.id.btnHome).setOnClickListener { loadInput(homeUrl) }
-
-        findViewById<Button>(R.id.btnBackDriving).setOnClickListener { goBackSafely() }
-        findViewById<Button>(R.id.btnReadAloud).setOnClickListener { readPageAloud() }
-        findViewById<Button>(R.id.btnVoiceDriving).setOnClickListener { startVoiceSearch() }
-        findViewById<Button>(R.id.btnStopReading).setOnClickListener { tts?.stop() }
-        findViewById<Button>(R.id.btnPins).setOnClickListener { showPins() }
-    }
-
-    /** Lists saved road pins; choosing one loads it, or pins the current page. */
-    private fun showPins() {
-        val pins = pinStore.all()
-        val canAdd = pins.size < PinStore.MAX
-        val labels = pins.map { it.title } + if (canAdd) listOf(getString(R.string.pin_this_page)) else emptyList()
-
-        if (labels.isEmpty()) {
-            Toast.makeText(this, R.string.pins_empty, Toast.LENGTH_LONG).show()
-            return
+        findViewById<Button>(R.id.btnBrowseBack).setOnClickListener {
+            if (browse.canGoBack()) browse.goBack()
         }
-        AlertDialog.Builder(this)
-            .setTitle(R.string.pins_title)
-            .setItems(labels.toTypedArray()) { _, which ->
-                if (which < pins.size) {
-                    loadInput(pins[which].url)
-                } else {
-                    pinCurrentPage()
-                }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        findViewById<Button>(R.id.btnBrowseForward).setOnClickListener {
+            if (browse.canGoForward()) browse.goForward()
+        }
+        findViewById<Button>(R.id.btnBrowseReload).setOnClickListener { browse.reload() }
+        findViewById<Button>(R.id.btnBrowseHome).setOnClickListener { loadInBrowse(homeUrl) }
+        findViewById<Button>(R.id.btnCloseBrowse).setOnClickListener { closeBrowse() }
     }
 
-    private fun pinCurrentPage() {
-        val url = webView.url
-        if (url.isNullOrBlank()) return
-        val title = webView.title?.takeIf { it.isNotBlank() } ?: url
-        val added = pinStore.add(PinStore.Pin(title.take(40), url))
-        val msg = if (added) title.take(40) else getString(R.string.pins_full)
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+    /** Methods the web UI calls. These run on a background thread, so they hop to the UI thread. */
+    inner class NativeBridge {
+        @JavascriptInterface
+        fun openUrl(url: String) = runOnUiThread { openBrowse(url) }
+
+        @JavascriptInterface
+        fun showBrowser(url: String) = runOnUiThread { openBrowse(url.ifBlank { homeUrl }) }
+
+        @JavascriptInterface
+        fun startVoice() = runOnUiThread { startVoiceSearch() }
     }
 
-    // --- Actions --------------------------------------------------------------
+    // --- Browsing -------------------------------------------------------------
 
-    private fun loadInput(raw: String) {
+    private fun openBrowse(raw: String) = runOnUiThread {
+        if (DriveService.driving.value) {
+            Toast.makeText(this, R.string.browse_locked, Toast.LENGTH_SHORT).show()
+            return@runOnUiThread
+        }
+        browseOverlay.visibility = View.VISIBLE
+        browse.onResume()
+        loadInBrowse(raw)
+    }
+
+    private fun loadInBrowse(raw: String) {
         val text = raw.trim()
         if (text.isEmpty()) return
         val url = when {
             text.startsWith("http://") || text.startsWith("https://") -> text
             text.contains('.') && !text.contains(' ') -> "https://$text"
-            else -> "https://duckduckgo.com/?q=" + Uri.encode(text)
+            else -> "https://www.google.com/search?q=" + Uri.encode(text)
         }
-        webView.loadUrl(url)
+        browse.loadUrl(url)
     }
 
-    private fun goBackSafely() {
-        if (webView.canGoBack()) webView.goBack() else loadInput(homeUrl)
+    private fun closeBrowse() {
+        pauseVideos(browse)
+        browse.onPause()
+        browseOverlay.visibility = View.GONE
     }
 
     private fun startVoiceSearch() {
@@ -266,47 +297,37 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         try {
             voiceLauncher.launch(intent)
         } catch (_: Exception) {
-            statusBadge.text = getString(R.string.voice_unavailable)
-        }
-    }
-
-    /** Reads the main visible text aloud, trimmed so a long article does not drone on. */
-    private fun readPageAloud() {
-        if (!ttsReady) return
-        val script = "(function(){var m=document.querySelector('article,main')||document.body;" +
-            "return (m && m.innerText) ? m.innerText.slice(0,1500) : '';})()"
-        webView.evaluateJavascript(script) { raw ->
-            val text = raw?.trim('"')?.replace("\\n", " ").orEmpty()
-            if (text.isNotBlank()) tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "page")
+            Toast.makeText(this, R.string.voice_unavailable, Toast.LENGTH_SHORT).show()
+            dashboard.evaluateJavascript("window.gloveboxVoiceResult && window.gloveboxVoiceResult('')", null)
         }
     }
 
     /**
-     * Video lock: while driving, pause every <video> and <audio> element on the page
-     * and keep them paused. This is the opposite of sideloaded browsers that bypass
-     * Android Auto's video lock.
+     * Video lock: pause every <video> and <audio> element and keep them paused while driving.
+     * This is the opposite of sideloaded browsers that bypass Android Auto's video lock.
      */
-    private fun pauseVideosWhileDriving() {
+    private fun pauseVideos(view: WebView) {
         val script = "(function(){document.querySelectorAll('video,audio').forEach(function(m){" +
             "try{m.pause();}catch(e){}});})()"
-        webView.evaluateJavascript(script, null)
+        view.evaluateJavascript(script, null)
     }
 
     // --- Mode switching -------------------------------------------------------
 
-    private fun applyMode(driving: Boolean) {
-        runOnUiThread {
-            // Driving: no address bar, large controls only.
-            addressBar.visibility = if (driving) View.GONE else View.VISIBLE
-            drivingBar.visibility = if (driving) View.VISIBLE else View.GONE
-            statusBadge.text = getString(
-                if (driving) R.string.badge_driving else R.string.badge_parked
-            )
-            if (driving) {
-                pauseVideosWhileDriving()
-                tts?.stop()
-            }
+    private fun applyDriving(driving: Boolean) {
+        pushDrivingToWeb(driving)
+        if (driving && browseOverlay.visibility == View.VISIBLE) {
+            // Browsing is locked while driving, so close it rather than leave a video open.
+            closeBrowse()
+            Toast.makeText(this, R.string.browse_locked, Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun pushDrivingToWeb(driving: Boolean) {
+        dashboard.evaluateJavascript(
+            "window.gloveboxSetDriving && window.gloveboxSetDriving($driving)",
+            null
+        )
     }
 
     private fun goFullscreen() {
@@ -322,6 +343,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     companion object {
-        private const val KEY_URL = "last_url"
+        private const val APP_DOMAIN = "appassets.androidplatform.net"
+        private const val DASHBOARD_URL = "https://$APP_DOMAIN/assets/glovebox/index.html#/home"
     }
 }

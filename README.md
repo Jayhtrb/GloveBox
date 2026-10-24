@@ -60,7 +60,16 @@ glovebox/
 
 ## Build
 
-Requirements: Android Studio (Ladybug or newer), JDK 17, Android SDK 35.
+Requirements: Android Studio (Ladybug or newer), JDK 17, Android SDK 35, Node 20.
+
+**The app shows the GloveBox UI from `web/`, so bundle it first** (CI does this automatically):
+
+```bash
+(cd web && npm install && npm run build)
+rm -rf app/src/main/assets/glovebox && mkdir -p app/src/main/assets && cp -r web/dist app/src/main/assets/glovebox
+```
+
+Without this step the home screen shows a blank page.
 
 Easiest path: open the folder in Android Studio. It downloads Gradle and the SDK and creates the Gradle wrapper on first sync. Then press Run.
 
