@@ -62,10 +62,15 @@ glovebox/
 
 Requirements: Android Studio (Ladybug or newer), JDK 17, Android SDK 35.
 
+Easiest path: open the folder in Android Studio. It downloads Gradle and the SDK and creates the Gradle wrapper on first sync. Then press Run.
+
+From the command line, after the wrapper exists:
+
 ```bash
 git clone https://github.com/<you>/glovebox.git
 cd glovebox
-./gradlew :app:assembleDebug   # or open in Android Studio and press Run
+gradle wrapper --gradle-version 8.9   # one-time, needs a local Gradle install
+./gradlew :app:assembleDebug
 ```
 
 Install on your phone (developer options → USB debugging enabled):
