@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Glovebox</string>
+    <string name="url_hint">Search or enter address</string>
+    <string name="btn_voice">🎙 Voice</string>
+    <string name="btn_back">← Back</string>
+    <string name="btn_home">⌂ Home</string>
+    <string name="btn_read">🔊 Read</string>
+    <string name="btn_stop">■ Stop</string>
+    <string name="badge_driving">DRIVE MODE · video locked</string>
+    <string name="badge_parked">Parked · full controls</string>
+    <string name="voice_prompt">Say a search or an address</string>
+    <string name="voice_unavailable">Voice search unavailable on this device</string>
+</resources>

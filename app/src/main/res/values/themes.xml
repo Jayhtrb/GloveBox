@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="gb_background">#0E1116</color>
+    <color name="gb_surface">#171C24</color>
+    <color name="gb_text">#F2F4F7</color>
+    <color name="gb_text_dim">#7C8696</color>
+    <color name="gb_accent">#FFB224</color>
+
+    <style name="Theme.Glovebox" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/gb_background</item>
+        <item name="colorPrimary">@color/gb_accent</item>
+        <item name="android:statusBarColor">@color/gb_background</item>
+        <item name="android:navigationBarColor">@color/gb_background</item>
+    </style>
+
+    <style name="GbButton" parent="Widget.AppCompat.Button.Borderless">
+        <item name="android:textColor">@color/gb_accent</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:minWidth">48dp</item>
+    </style>
+
+    <style name="GbButtonLarge" parent="Widget.AppCompat.Button">
+        <item name="android:textColor">@color/gb_text</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:minHeight">80dp</item>
+        <item name="android:backgroundTint">#23303F</item>
+    </style>
+</resources>
