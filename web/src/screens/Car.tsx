@@ -3,7 +3,7 @@ import { useApp, type Prefs } from '../store';
 import { Pill, Toggle } from '../components/Primitives';
 
 export default function Car() {
-  const { prefs, setPrefs } = useApp();
+  const { prefs, setPrefs, setDriveMode } = useApp();
 
   return (
     <div className="stack" style={{ gap: 18 }}>
@@ -106,10 +106,10 @@ export default function Car() {
           </h3>
           <div className="field-row">
             <div>
-              <div>Drive Mode (demo switch)</div>
-              <div className="small muted">On Android, this follows speed and vehicle state</div>
+              <div>Drive Mode</div>
+              <div className="small muted">You turn it on and off. Nothing switches it for you.</div>
             </div>
-            <Toggle checked={prefs.driveMode} onChange={(v) => setPrefs({ driveMode: v })} label="Drive Mode demo switch" />
+            <Toggle checked={prefs.driveMode} onChange={(v) => setDriveMode(v)} label="Drive Mode" />
           </div>
           <div className="field-row">
             <div>
@@ -130,9 +130,8 @@ export default function Car() {
         <section className="card" aria-label="App permissions">
           <h3>Permissions</h3>
           <ul className="list small">
-            <li><span className="grow"><b>Location</b>: Drive Mode speed (Android app). Not requested in the web prototype.</span></li>
+            <li><span className="grow"><b>Location</b>: not used. GloveBox doesn't read your speed.</span></li>
             <li><span className="grow"><b>Microphone</b>: voice commands, if your browser allows speech input.</span></li>
-            <li><span className="grow"><b>Notifications</b>: the Android Drive Mode service.</span></li>
           </ul>
         </section>
       </div>

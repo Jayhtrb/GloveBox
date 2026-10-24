@@ -105,6 +105,7 @@ export interface PlayerState {
 export interface AppState {
   prefs: Prefs;
   setPrefs: (patch: Partial<Prefs>) => void;
+  setDriveMode: (on: boolean) => void;
   resetPrefs: () => void;
   allApps: AppDef[];
   route: Route;
@@ -130,6 +131,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setPrefs = useCallback((patch: Partial<Prefs>) => setPrefsState((p) => ({ ...p, ...patch })), []);
   const resetPrefs = useCallback(() => setPrefsState(DEFAULT_PREFS), []);
+  // Drive Mode is always the user's choice. Inside the app, the native side stores it too,
+  // so the video lock and the browser follow the same switch.
+  const setDriveMode = useCallback((on: boolean) => {
+    setPrefsState((p) => ({ ...p, driveMode: on }));
+    if (isNative) native?.setDriveMode(on);
+  }, []);
   const allApps = useMemo(() => [...BUILTIN_APPS, ...prefs.customApps], [prefs.customApps]);
 
   // Route lives in the hash so the browser's back button and deep links work.
@@ -150,7 +157,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRoute(r);
   }, [prefs.homeUrl]);
 
-  // The Android app reports Drive Mode from its foreground service.
+  // The Android app reports its saved Drive Mode state when a page loads.
   useEffect(() => {
     window.gloveboxSetDriving = (driving: boolean) => setPrefsState((p) => ({ ...p, driveMode: driving }));
     return () => {
@@ -261,6 +268,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value: AppState = {
     prefs,
     setPrefs,
+    setDriveMode,
     resetPrefs,
     allApps,
     route,

@@ -1,8 +1,8 @@
 # Glovebox 🚗
 
-> A browser that lives in your car's glovebox — full-screen, voice-first, and locked into a safe "Drive Mode" whenever the car moves.
+> A browser that lives in your car's glovebox — full-screen, voice-first, with a Drive Mode switch you control.
 
-Glovebox is an Android browser built for the car. It runs full-screen on a phone (and on a phone projected to a head unit via Android Auto), switches into a driver-safe layout automatically when the car is moving, and lets you do the few things you actually need on the road — read a page aloud, go back, open a saved link, or search by voice — without touching anything.
+Glovebox is an Android browser built for the car. It runs full-screen on a phone (and on a phone projected to a head unit via Android Auto), has a Drive Mode switch you turn on yourself. It never switches itself on or closes a page, and lets you do the few things you actually need on the road — read a page aloud, go back, open a saved link, or search by voice — without touching anything.
 
 ## Why this exists (research summary)
 
@@ -28,7 +28,7 @@ Takeaways that shaped the design:
 ## Features
 
 - Full-screen WebView browser with an address bar when parked
-- **Drive Mode**: automatic when GPS speed exceeds ~18 km/h (5 m/s). Hides the address bar, pauses any playing video, shows large buttons only, and turns on read-aloud
+- **Drive Mode**: a switch you turn on and off yourself. The app never reads your speed or turns it on for you. When it's on, playing video and audio are paused and new pages can't be opened
 - **Voice-first controls**: voice search, "read this page" (text-to-speech of the page's main text), back, home
 - **Video lock**: video and autoplay media are paused while driving (the opposite of common sideloaded browsers)
 - **Pin for the road**: save up to five links as big tiles for Drive Mode home screen
@@ -49,8 +49,7 @@ glovebox/
     └── src/main/
         ├── AndroidManifest.xml
         ├── java/app/glovebox/
-        │   ├── MainActivity.kt        # Browser UI, Drive Mode switch, voice, TTS
-        │   └── DriveModeMonitor.kt    # GPS speed → driving / parked with hysteresis
+        │   └── MainActivity.kt        # Home screen, native browser, Drive Mode switch, voice
         └── res/
             ├── layout/activity_main.xml
             └── values/
@@ -92,8 +91,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 1. **Wired**: plug the phone into the head unit. Open Android Auto's launcher settings and make sure Glovebox is enabled if your head unit lists third-party apps.
 2. **Wireless**: on the phone, Android 11+ with 5 GHz Wi‑Fi. In Android Auto settings, enable "Wireless Android Auto" and pair over Bluetooth once.
-3. Drive as usual. Glovebox switches to Drive Mode on its own, and keeps watching speed while navigation is in front. A persistent low-priority notification ("Drive Mode monitoring") shows while the service runs; that's how Android keeps GPS on.
-   In Drive Mode you can still use Voice, Read, Pins, Back and Stop. Typing an address is hidden while moving. Stopped at a light? It stays in Drive Mode for 30 seconds after you stop, then returns to full controls.
+3. Turn Drive Mode on yourself from the top bar or Car settings when you want it. Glovebox doesn't switch it on by itself, and it doesn't close pages you have open. While it's on, playing video and audio are paused and new pages can't be opened. Turn it off the same way.
 
 ## Safety and legal notes
 
@@ -104,11 +102,10 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ## Roadmap
 
 - [x] Fullscreen browser, address bar, back/home
-- [x] GPS-based Drive Mode with hysteresis (`DriveState`, unit-tested)
+- [x] Manual Drive Mode switch (user-controlled; the earlier GPS speed detection was removed at the user's request)
 - [x] Video lock while driving
 - [x] Voice search and read-aloud
 - [x] Pinned road tiles (up to 5, `PinStore`, unit-tested; pinned from the Pins dialog)
-- [x] Drive Mode keeps working in the background: GPS runs in a foreground service (`DriveService`), so it still switches correctly while Google Maps or another app is in front
 - [x] CI: unit tests and debug APK build on every push (GitHub Actions)
 - [ ] Remove or rename a pin (needs a small management screen)
 - [ ] Car App Library surface for Android Auto's official templates (only if a permitted category fits)
@@ -120,11 +117,11 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 gradle :app:testDebugUnitTest
 ```
 
-Unit tests cover the Drive Mode state machine (entry, exit delay, red-light stops, threshold rules) and pin storage (parsing, sanitizing, limits). The Android UI, GPS, voice, and TTS paths are not covered by unit tests and need a manual drive test.
+Unit tests cover pin storage (parsing, sanitizing, limits). The Android UI, voice, and video lock paths are not covered by unit tests and need a manual test.
 
 ## Status
 
-Feature-complete for v0.1 in code. GitHub Actions compiles the app, runs the unit tests, and builds the debug APK on every push. The latest runs on `main` pass and attach the APK as the `glovebox-debug-apk` artifact. It has also **not been tested on a real car or head unit**. The first real milestone is: install on your phone, drive, and confirm Drive Mode switches on and video stays locked.
+Feature-complete for v0.1 in code. GitHub Actions compiles the app, runs the unit tests, and builds the debug APK on every push. The latest runs on `main` pass and attach the APK as the `glovebox-debug-apk` artifact. It has also **not been tested on a real car or head unit**. The first real milestone is: install on your phone, drive, and confirm the Drive Mode switch pauses video and that nothing turns it on or closes a page without you.
 
 ## License
 

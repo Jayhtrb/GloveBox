@@ -1,10 +1,9 @@
 package app.glovebox
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
-import android.content.pm.PackageManager
+import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -29,19 +28,16 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import androidx.webkit.WebViewAssetLoader
-import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 /**
  * Shows the GloveBox UI (bundled from web/ into assets/glovebox) as the home screen.
  * Browsing happens in a native WebView on top of it, so sites that block iframes still load.
  *
- * Drive state comes from [DriveService] and is pushed into the web UI, which then shows the
- * Drive Mode layout. While driving, browsing closes and any video is paused.
+ * Drive Mode is a switch the user turns on and off. The app never turns it on by itself,
+ * and it never closes the browser on its own. While Drive Mode is on, new pages can't be
+ * opened and video and audio are paused, but the user decides what stays open.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -51,6 +47,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var urlInput: EditText
 
     private val homeUrl = "https://www.google.com"
+    private var driveMode = false
 
     private val assetLoader by lazy {
         WebViewAssetLoader.Builder()
@@ -58,13 +55,6 @@ class MainActivity : AppCompatActivity() {
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
             .build()
     }
-
-    private val permissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
-            if (grants[Manifest.permission.ACCESS_FINE_LOCATION] == true) {
-                DriveService.start(this)
-            }
-        }
 
     private val voiceLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -88,6 +78,8 @@ class MainActivity : AppCompatActivity() {
         browseOverlay = findViewById(R.id.browseOverlay)
         urlInput = findViewById(R.id.urlInput)
 
+        driveMode = getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_DRIVE_MODE, false)
+
         configureDashboard()
         configureBrowser()
         configureBrowseControls()
@@ -106,28 +98,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
-
-        // Drive state comes from the foreground service, so it keeps updating while
-        // navigation is in front.
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                DriveService.driving.collect { applyDriving(it) }
-            }
-        }
-
-        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            DriveService.start(this)
-        } else {
-            permissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.RECORD_AUDIO,
-                    Manifest.permission.POST_NOTIFICATIONS
-                )
-            )
-        }
 
         dashboard.loadUrl(DASHBOARD_URL)
         intent?.dataString?.let { openBrowse(it) }
@@ -152,7 +122,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        // DriveService keeps running on purpose; only the UI goes away here.
         dashboard.destroy()
         browse.destroy()
         super.onDestroy()
@@ -193,7 +162,7 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageFinished(view: WebView, url: String?) {
                 // Tell the freshly loaded page the current drive state.
-                pushDrivingToWeb(DriveService.driving.value)
+                pushDrivingToWeb(driveMode)
             }
         }
     }
@@ -225,7 +194,7 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageFinished(view: WebView, url: String?) {
                 urlInput.setText(url ?: "")
-                if (DriveService.driving.value) pauseVideos(browse)
+                if (driveMode) pauseVideos(browse)
             }
         }
     }
@@ -258,12 +227,15 @@ class MainActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun startVoice() = runOnUiThread { startVoiceSearch() }
+
+        @JavascriptInterface
+        fun setDriveMode(on: Boolean) = runOnUiThread { applyDriveMode(on) }
     }
 
     // --- Browsing -------------------------------------------------------------
 
     private fun openBrowse(raw: String) = runOnUiThread {
-        if (DriveService.driving.value) {
+        if (driveMode) {
             Toast.makeText(this, R.string.browse_locked, Toast.LENGTH_SHORT).show()
             return@runOnUiThread
         }
@@ -314,13 +286,13 @@ class MainActivity : AppCompatActivity() {
 
     // --- Mode switching -------------------------------------------------------
 
-    private fun applyDriving(driving: Boolean) {
-        pushDrivingToWeb(driving)
-        if (driving && browseOverlay.visibility == View.VISIBLE) {
-            // Browsing is locked while driving, so close it rather than leave a video open.
-            closeBrowse()
-            Toast.makeText(this, R.string.browse_locked, Toast.LENGTH_SHORT).show()
-        }
+    /** Called only from the user's Drive Mode switch in the web UI. */
+    private fun applyDriveMode(on: Boolean) {
+        driveMode = on
+        getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_DRIVE_MODE, on).apply()
+        pushDrivingToWeb(on)
+        // Pause media that is already playing. The browser stays open unless the user closes it.
+        if (on && browseOverlay.visibility == View.VISIBLE) pauseVideos(browse)
     }
 
     private fun pushDrivingToWeb(driving: Boolean) {
@@ -343,6 +315,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
+        private const val PREFS = "glovebox"
+        private const val KEY_DRIVE_MODE = "drive_mode"
         private const val APP_DOMAIN = "appassets.androidplatform.net"
         private const val DASHBOARD_URL = "https://$APP_DOMAIN/assets/glovebox/index.html#/home"
     }

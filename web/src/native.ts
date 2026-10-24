@@ -8,6 +8,8 @@ interface NativeBridge {
   openUrl(url: string): void;
   /** Show the native browser with the given page or the home page. */
   showBrowser(url: string): void;
+  /** Turn Drive Mode on or off. Only the user changes it; the app never switches it by itself. */
+  setDriveMode(on: boolean): void;
   /** Start the system speech recognizer. The result comes back through window.gloveboxVoiceResult. */
   startVoice(): void;
 }

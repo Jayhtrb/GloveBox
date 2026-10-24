@@ -242,9 +242,8 @@ export default function Settings() {
           <section className="card">
             <h2>Permissions</h2>
             <ul className="list small">
-              <li><span className="grow"><b>Location</b>: Drive Mode in the Android app. Not used by the web prototype.</span></li>
+              <li><span className="grow"><b>Location</b>: not used. GloveBox doesn't read your speed.</span></li>
               <li><span className="grow"><b>Microphone</b>: voice commands through the browser, if allowed.</span></li>
-              <li><span className="grow"><b>Notifications</b>: Android Drive Mode service.</span></li>
             </ul>
           </section>
         )}

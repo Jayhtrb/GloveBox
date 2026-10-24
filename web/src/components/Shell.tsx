@@ -3,7 +3,6 @@ import { Car, Globe, Home, LayoutGrid, Mic, Music, Navigation, Settings, Smartph
 import { useApp } from '../store';
 import type { Route } from '../data';
 import { Logo } from './Primitives';
-import { isNative } from '../native';
 
 export function useNow(intervalMs = 15000): Date {
   const [now, setNow] = useState(new Date());
@@ -64,7 +63,7 @@ export function Rail() {
 }
 
 export function TopBar() {
-  const { prefs, setPrefs, go } = useApp();
+  const { prefs, setDriveMode, go } = useApp();
   const now = useNow();
   const online = useOnline();
   const time = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -79,11 +78,11 @@ export function TopBar() {
       <button
         type="button"
         className={`chip ${prefs.driveMode ? 'active' : ''}`}
-        onClick={() => setPrefs({ driveMode: !prefs.driveMode })}
+        onClick={() => setDriveMode(!prefs.driveMode)}
         aria-pressed={prefs.driveMode}
-        title="Demo switch. On Android, Drive Mode follows vehicle and GPS state."
+        title="Turn Drive Mode on or off yourself"
       >
-        {isNative ? (prefs.driveMode ? 'Drive Mode' : 'Parked') : prefs.driveMode ? 'Drive Mode (demo)' : 'Parked (demo)'}
+        {prefs.driveMode ? 'Drive Mode on' : 'Drive Mode off'}
       </button>
       <div className="status" aria-label="Status">
         <span className="time">{time}</span>
