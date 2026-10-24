@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Bundle
 import android.speech.RecognizerIntent
 import android.view.KeyEvent
+import android.widget.FrameLayout
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.webkit.JavascriptInterface
@@ -45,6 +46,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var browse: WebView
     private lateinit var browseOverlay: LinearLayout
     private lateinit var urlInput: EditText
+    private lateinit var videoContainer: FrameLayout
+    private var fullscreenView: View? = null
+    private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
 
     private val homeUrl = "https://www.google.com"
     private var driveMode = false
@@ -77,6 +81,7 @@ class MainActivity : AppCompatActivity() {
         browse = findViewById(R.id.browse)
         browseOverlay = findViewById(R.id.browseOverlay)
         urlInput = findViewById(R.id.urlInput)
+        videoContainer = findViewById(R.id.videoContainer)
 
         driveMode = getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_DRIVE_MODE, false)
 
@@ -88,6 +93,7 @@ class MainActivity : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 when {
+                    fullscreenView != null -> exitFullscreenVideo()
                     browseOverlay.visibility == View.VISIBLE && browse.canGoBack() -> browse.goBack()
                     browseOverlay.visibility == View.VISIBLE -> closeBrowse()
                     dashboard.canGoBack() -> dashboard.goBack()
@@ -123,6 +129,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         dashboard.destroy()
+        exitFullscreenVideo()
         browse.destroy()
         super.onDestroy()
     }
@@ -179,7 +186,31 @@ class MainActivity : AppCompatActivity() {
             builtInZoomControls = false
             cacheMode = WebSettings.LOAD_DEFAULT
         }
-        browse.webChromeClient = WebChromeClient()
+        browse.webChromeClient = object : WebChromeClient() {
+            // Lets video players (YouTube and others) use their own fullscreen button.
+            override fun onShowCustomView(view: View, callback: CustomViewCallback) {
+                if (driveMode) {
+                    // Drive Mode is the user's switch: no fullscreen video while it's on.
+                    callback.onCustomViewHidden()
+                    Toast.makeText(this@MainActivity, R.string.video_locked, Toast.LENGTH_SHORT).show()
+                    return
+                }
+                if (fullscreenView != null) {
+                    callback.onCustomViewHidden()
+                    return
+                }
+                fullscreenView = view
+                fullscreenCallback = callback
+                videoContainer.addView(view, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+                videoContainer.visibility = View.VISIBLE
+                window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+
+            override fun onHideCustomView() {
+                exitFullscreenVideo()
+            }
+        }
         browse.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val uri = request.url
@@ -255,7 +286,18 @@ class MainActivity : AppCompatActivity() {
         browse.loadUrl(url)
     }
 
+    private fun exitFullscreenVideo() {
+        val view = fullscreenView ?: return
+        videoContainer.removeView(view)
+        videoContainer.visibility = View.GONE
+        fullscreenView = null
+        fullscreenCallback?.onCustomViewHidden()
+        fullscreenCallback = null
+        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
     private fun closeBrowse() {
+        exitFullscreenVideo()
         pauseVideos(browse)
         browse.onPause()
         browseOverlay.visibility = View.GONE

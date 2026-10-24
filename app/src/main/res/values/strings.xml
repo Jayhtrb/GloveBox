@@ -3,6 +3,7 @@
     <string name="app_name">GloveBox</string>
     <string name="url_hint">Search or enter address</string>
     <string name="btn_close_browse">GloveBox</string>
+    <string name="video_locked">Fullscreen video is locked while Drive Mode is on</string>
     <string name="browse_locked">Browsing is locked while driving</string>
     <string name="voice_prompt">Say a search or an address</string>
     <string name="voice_unavailable">Voice search unavailable on this device</string>
