@@ -115,7 +115,7 @@ Unit tests cover the Drive Mode state machine (entry, exit delay, red-light stop
 
 ## Status
 
-Feature-complete for v0.1 in code. The CI workflow is set up to compile and run the unit tests, but that has **not been run yet** because the repo isn't on GitHub. It has also **not been tested on a real car or head unit**. The first real milestone is: install on your phone, drive, and confirm Drive Mode switches on and video stays locked.
+Feature-complete for v0.1 in code. GitHub Actions compiles the app, runs the unit tests, and builds the debug APK on every push. The latest runs on `main` pass and attach the APK as the `glovebox-debug-apk` artifact. It has also **not been tested on a real car or head unit**. The first real milestone is: install on your phone, drive, and confirm Drive Mode switches on and video stays locked.
 
 ## License
 
