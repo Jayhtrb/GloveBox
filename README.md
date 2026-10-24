@@ -120,3 +120,22 @@ Feature-complete for v0.1 in code. The CI workflow is set up to compile and run 
 ## License
 
 MIT
+
+## Web prototype (`web/`)
+
+An interactive React + TypeScript prototype of the GloveBox interface. It runs in any browser and is meant for design review and layout testing. It is not the Android app.
+
+```bash
+cd web
+npm install
+npm run dev      # local development server
+npm run build    # type-check and production build into web/dist
+```
+
+Screens: Home, Browser, Media, Navigation, App Library, Car & Connectivity, Settings, and Assistant. Preferences and pins persist in `localStorage`.
+
+Limitations:
+- Media playback, navigation routes, weather, and traffic are **simulated**. No streaming, map, or vehicle data is connected.
+- Many websites block being shown inside other pages. The browser offers "Open in new tab" for those.
+- The assistant runs local commands only. No AI provider is connected.
+- The web prototype cannot run on a car display. Android Auto requires the native Android app.
