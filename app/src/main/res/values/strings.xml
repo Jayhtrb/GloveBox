@@ -7,6 +7,11 @@
     <string name="btn_home">⌂ Home</string>
     <string name="btn_read">🔊 Read</string>
     <string name="btn_stop">■ Stop</string>
+    <string name="btn_pins">📌 Pins</string>
+    <string name="pins_title">Road pins</string>
+    <string name="pin_this_page">📌 Pin this page</string>
+    <string name="pins_full">Pins are full (5 max)</string>
+    <string name="pins_empty">No pins yet. Open Pins while parked to add one.</string>
     <string name="badge_driving">DRIVE MODE · video locked</string>
     <string name="badge_parked">Parked · full controls</string>
     <string name="voice_prompt">Say a search or an address</string>

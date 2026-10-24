@@ -6,42 +6,26 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
-import android.os.Handler
 import android.os.Looper
 
 /**
- * Decides whether the car is moving, using GPS speed.
- *
- * Hysteresis keeps the UI from flickering at a red light:
- *  - Enter Drive Mode when speed >= [ENTER_SPEED_MPS] (about 18 km/h).
- *  - Leave Drive Mode only after speed has stayed below [EXIT_SPEED_MPS]
- *    for [EXIT_DELAY_MS] (30 s), so a short stop does not switch layouts.
+ * Feeds GPS speed into [DriveState] and reports driving/parked changes.
+ * The state logic lives in [DriveState]; this class only handles Android location.
  */
 class DriveModeMonitor(
     context: Context,
     private val onChanged: (driving: Boolean) -> Unit
 ) {
     companion object {
-        const val ENTER_SPEED_MPS = 5.0f
-        const val EXIT_SPEED_MPS = 2.0f
-        const val EXIT_DELAY_MS = 30_000L
         private const val MIN_UPDATE_MS = 1_000L
     }
 
-    private val appContext = context.applicationContext
     private val locationManager =
-        appContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    private val handler = Handler(Looper.getMainLooper())
-
-    var isDriving: Boolean = false
-        private set
-
-    private var slowSince: Long? = null
+        context.applicationContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+    private val state = DriveState()
     private var active = false
 
-    private val exitRunnable = Runnable {
-        if (isDriving) setDriving(false)
-    }
+    val isDriving: Boolean get() = state.isDriving
 
     private val listener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
@@ -65,11 +49,9 @@ class DriveModeMonitor(
                 Looper.getMainLooper()
             )
         } catch (_: SecurityException) {
-            // Location permission not granted: stay in parked mode.
-            active = false
+            active = false // no permission: stay parked
         } catch (_: IllegalArgumentException) {
-            // GPS provider missing on this device.
-            active = false
+            active = false // no GPS provider on this device
         }
     }
 
@@ -77,29 +59,10 @@ class DriveModeMonitor(
         if (!active) return
         active = false
         locationManager.removeUpdates(listener)
-        handler.removeCallbacks(exitRunnable)
     }
 
-    /** Exposed for testing and for the manual "I'm the passenger" toggle. */
+    /** Also used by the manual "I'm the passenger" toggle path. */
     fun onSpeed(speedMps: Float, timestampMs: Long = System.currentTimeMillis()) {
-        when {
-            speedMps >= ENTER_SPEED_MPS -> {
-                slowSince = null
-                handler.removeCallbacks(exitRunnable)
-                if (!isDriving) setDriving(true)
-            }
-            speedMps < EXIT_SPEED_MPS && isDriving -> {
-                if (slowSince == null) {
-                    slowSince = timestampMs
-                    handler.postDelayed(exitRunnable, EXIT_DELAY_MS)
-                }
-            }
-        }
-    }
-
-    private fun setDriving(driving: Boolean) {
-        isDriving = driving
-        if (!driving) slowSince = null
-        onChanged(driving)
+        state.update(speedMps, timestampMs)?.let { onChanged(it) }
     }
 }

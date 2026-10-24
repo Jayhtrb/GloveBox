@@ -22,7 +22,9 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -38,6 +40,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var statusBadge: TextView
 
     private lateinit var driveMonitor: DriveModeMonitor
+    private lateinit var pinStore: PinStore
     private var tts: TextToSpeech? = null
     private var ttsReady = false
 
@@ -76,6 +79,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         goFullscreen()
 
         driveMonitor = DriveModeMonitor(this) { driving -> applyMode(driving) }
+        pinStore = PinStore(this)
         tts = TextToSpeech(this, this)
 
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
@@ -188,6 +192,39 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         findViewById<Button>(R.id.btnReadAloud).setOnClickListener { readPageAloud() }
         findViewById<Button>(R.id.btnVoiceDriving).setOnClickListener { startVoiceSearch() }
         findViewById<Button>(R.id.btnStopReading).setOnClickListener { tts?.stop() }
+        findViewById<Button>(R.id.btnPins).setOnClickListener { showPins() }
+    }
+
+    /** Lists saved road pins; choosing one loads it, or pins the current page. */
+    private fun showPins() {
+        val pins = pinStore.all()
+        val canAdd = pins.size < PinStore.MAX
+        val labels = pins.map { it.title } + if (canAdd) listOf(getString(R.string.pin_this_page)) else emptyList()
+
+        if (labels.isEmpty()) {
+            Toast.makeText(this, R.string.pins_empty, Toast.LENGTH_LONG).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.pins_title)
+            .setItems(labels.toTypedArray()) { _, which ->
+                if (which < pins.size) {
+                    loadInput(pins[which].url)
+                } else {
+                    pinCurrentPage()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun pinCurrentPage() {
+        val url = webView.url
+        if (url.isNullOrBlank()) return
+        val title = webView.title?.takeIf { it.isNotBlank() } ?: url
+        val added = pinStore.add(PinStore.Pin(title.take(40), url))
+        val msg = if (added) title.take(40) else getString(R.string.pins_full)
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
     }
 
     // --- Actions --------------------------------------------------------------

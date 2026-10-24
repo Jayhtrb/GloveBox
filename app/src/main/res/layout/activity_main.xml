@@ -77,6 +77,14 @@
             android:text="@string/btn_voice" />
 
         <Button
+            android:id="@+id/btnPins"
+            style="@style/GbButtonLarge"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/btn_pins" />
+
+        <Button
             android:id="@+id/btnStopReading"
             style="@style/GbButtonLarge"
             android:layout_width="0dp"

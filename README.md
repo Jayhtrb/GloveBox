@@ -94,16 +94,26 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ## Roadmap
 
 - [x] Fullscreen browser, address bar, back/home
-- [x] GPS-based Drive Mode with hysteresis
+- [x] GPS-based Drive Mode with hysteresis (`DriveState`, unit-tested)
 - [x] Video lock while driving
-- [ ] Voice search and read-aloud (scaffolded in `MainActivity.kt`, needs device testing)
-- [ ] Pinned road tiles
+- [x] Voice search and read-aloud
+- [x] Pinned road tiles (up to 5, `PinStore`, unit-tested; pinned from the Pins dialog)
+- [x] CI: unit tests and debug APK build on every push (GitHub Actions)
+- [ ] Remove or rename a pin (needs a small management screen)
 - [ ] Car App Library surface for Android Auto's official templates (only if a permitted category fits)
 - [ ] Offline reader mode for long articles
 
+## Tests
+
+```bash
+gradle :app:testDebugUnitTest
+```
+
+Unit tests cover the Drive Mode state machine (entry, exit delay, red-light stops, threshold rules) and pin storage (parsing, sanitizing, limits). The Android UI, GPS, voice, and TTS paths are not covered by unit tests and need a manual drive test.
+
 ## Status
 
-Early scaffold. Not yet compiled against a device. Treat the first milestone as "it builds, opens a page, and switches to Drive Mode on a real drive."
+Feature-complete for v0.1 in code. The CI workflow is set up to compile and run the unit tests, but that has **not been run yet** because the repo isn't on GitHub. It has also **not been tested on a real car or head unit**. The first real milestone is: install on your phone, drive, and confirm Drive Mode switches on and video stays locked.
 
 ## License
 
